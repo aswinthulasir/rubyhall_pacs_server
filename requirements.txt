@@ -1,0 +1,26 @@
+# ─── Web Framework ────────────────────────────────────────────────────────────
+fastapi
+uvicorn[standard]
+python-multipart       # required for file/form uploads
+
+# ─── Database ─────────────────────────────────────────────────────────────────
+sqlalchemy
+pymysql                # MySQL driver used by SQLAlchemy
+cryptography          # required by pymysql for secure connections
+
+# ─── Authentication ───────────────────────────────────────────────────────────
+passlib[bcrypt]        # password hashing
+python-jose[cryptography]  # JWT encoding / decoding
+
+# ─── DICOM Processing ─────────────────────────────────────────────────────────
+pydicom                # read / write DICOM files
+numpy                 # pixel array manipulation
+Pillow                # thumbnail generation (PNG/JPEG)
+
+# ─── HTTP Client (for Orthanc calls) ──────────────────────────────────────────
+httpx
+
+# ─── Utilities ────────────────────────────────────────────────────────────────
+pydantic[email]    # request / response validation (with email support)
+pydantic-settings
+python-dotenv
