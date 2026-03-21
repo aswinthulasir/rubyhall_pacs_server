@@ -19,6 +19,8 @@ Routes:
 """
 
 import os
+import uuid
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
@@ -29,7 +31,7 @@ from models import DicomStudy, User, OrthancServer
 from schemas import (
     SendOrthancResponse, OrthancStudySummary, MessageResponse,
     OrthancServerCreate, OrthancServerUpdate, OrthancServerOut,
-    OrthancTestResult,
+    OrthancTestResult, DicomStudyOut,
 )
 from auth.security import get_current_user
 from services.orthanc_service import (
@@ -38,9 +40,19 @@ from services.orthanc_service import (
     get_orthanc_study_detail,
     download_dicom_from_orthanc,
     check_orthanc_health,
+    list_study_instances,
+    download_instance_file,
+)
+from services.dicom_service import (
+    extract_metadata,
+    generate_thumbnail,
+    save_dicom_to_folder,
 )
 import config
+import pydicom
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/orthanc", tags=["Orthanc / RadiAnt"])
 
@@ -176,24 +188,49 @@ def get_orthanc_studies(
     current_user: User    = Depends(get_current_user),
     db          : Session = Depends(get_db),
 ):
-    """Retrieve all DICOM studies currently stored in the user's active Orthanc."""
+    """Retrieve all DICOM studies in Orthanc, cross-referenced with our DB."""
     creds = _get_active_creds(current_user, db)
     success, message, studies = list_orthanc_studies(creds)
 
     if not success:
         raise HTTPException(503, f"Could not retrieve studies from Orthanc: {message}")
 
-    return [
-        OrthancStudySummary(
-            orthanc_id        = s.get("orthanc_id"),
-            patient_name      = s.get("patient_name"),
-            patient_id        = s.get("patient_id"),
-            study_date        = s.get("study_date"),
-            study_description = s.get("study_description"),
-            modality          = s.get("modality"),
-        )
-        for s in studies
-    ]
+    # Cross-reference: find which orthanc_study_ids we have locally
+    local_studies = (
+        db.query(DicomStudy)
+        .filter(DicomStudy.sent_to_orthanc == True)
+        .all()
+    )
+    # Map: orthanc_study_id -> (local study id, uploader name)
+    sent_map: Dict[str, tuple] = {}
+    for ls in local_studies:
+        if ls.orthanc_study_id:
+            uploader_name = None
+            if ls.uploader:
+                uploader_name = ls.uploader.full_name
+            sent_map[ls.orthanc_study_id] = (ls.id, uploader_name)
+
+    result = []
+    for s in studies:
+        orthanc_id = s.get("orthanc_id")
+        is_ours = orthanc_id in sent_map
+        local_id = sent_map[orthanc_id][0] if is_ours else None
+        sender   = sent_map[orthanc_id][1] if is_ours else None
+
+        result.append(OrthancStudySummary(
+            orthanc_id         = orthanc_id,
+            patient_name       = s.get("patient_name"),
+            patient_id         = s.get("patient_id"),
+            study_date         = s.get("study_date"),
+            study_description  = s.get("study_description"),
+            modality           = s.get("modality"),
+            study_instance_uid = s.get("study_instance_uid"),
+            sent_by_us         = is_ours,
+            local_study_id     = local_id,
+            sent_by_user       = sender,
+        ))
+
+    return result
 
 
 @router.get("/studies/{orthanc_id}")
@@ -234,10 +271,121 @@ def download_from_orthanc(
 
     filename = study.file_name or f"orthanc_{study.orthanc_instance_id}.dcm"
     return Response(
+
         content      = dicom_bytes,
         media_type   = "application/dicom",
         headers      = {"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Import study FROM Orthanc into our local PACS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.post("/import/{orthanc_id}")
+def import_from_orthanc(
+    orthanc_id   : str,
+    current_user : User    = Depends(get_current_user),
+    db           : Session = Depends(get_db),
+):
+    """
+    Download all DICOM instances of an Orthanc study and save them
+    locally as a new DicomStudy, following the same folder structure.
+    """
+    creds = _get_active_creds(current_user, db)
+
+    # 1. Get study metadata from Orthanc
+    ok, msg, study_data = get_orthanc_study_detail(orthanc_id, creds)
+    if not ok:
+        raise HTTPException(503, f"Could not fetch study from Orthanc: {msg}")
+
+    # 2. List all instances
+    ok, msg, instance_ids = list_study_instances(orthanc_id, creds)
+    if not ok or len(instance_ids) == 0:
+        raise HTTPException(400, f"No instances found in Orthanc study: {msg}")
+
+    # 3. Download each instance and save to a local study folder
+    study_folder_name = f"study_{uuid.uuid4().hex[:12]}"
+    study_folder_path = os.path.join(config.DICOM_DIR, study_folder_name)
+
+    first_meta = None
+    first_thumb = None
+    first_saved_path = None
+    total_size_kb = 0.0
+    file_count = 0
+
+    for inst_id in instance_ids:
+        success, file_bytes = download_instance_file(inst_id, creds)
+        if not success or not file_bytes:
+            logger.warning("Could not download instance %s", inst_id)
+            continue
+
+        saved_path, size_kb = save_dicom_to_folder(
+            file_bytes, f"{inst_id}.dcm", study_folder_name
+        )
+        total_size_kb += size_kb
+        file_count += 1
+
+        # Extract metadata from the first valid file only
+        if first_meta is None:
+            try:
+                first_saved_path = saved_path
+                ds = pydicom.dcmread(saved_path, force=True)
+                first_meta = extract_metadata(ds)
+                study_uid = first_meta.get("study_instance_uid") or str(uuid.uuid4())
+                first_thumb = generate_thumbnail(ds, study_uid)
+            except Exception as exc:
+                logger.warning("Metadata extraction failed for %s: %s", inst_id, exc)
+
+    if file_count == 0:
+        raise HTTPException(500, "Failed to download any instances from Orthanc")
+
+    meta = first_meta or {}
+    auto_mr = (meta.get("patient_name") or "IMPORTED").replace(" ", "_").upper()[:50]
+
+    # 4. Create a DicomStudy record
+    study = DicomStudy(
+        mr_number           = auto_mr,
+        patient_name        = meta.get("patient_name"),
+        patient_id_dicom    = meta.get("patient_id_dicom"),
+        patient_age         = meta.get("patient_age"),
+        patient_dob         = meta.get("patient_dob"),
+        patient_sex         = meta.get("patient_sex"),
+        study_date          = meta.get("study_date"),
+        study_time          = meta.get("study_time"),
+        study_description   = meta.get("study_description"),
+        modality            = meta.get("modality"),
+        body_part           = meta.get("body_part"),
+        accession_number    = meta.get("accession_number"),
+        study_instance_uid  = meta.get("study_instance_uid"),
+        series_instance_uid = meta.get("series_instance_uid"),
+        sop_instance_uid    = meta.get("sop_instance_uid"),
+        sop_class_uid       = meta.get("sop_class_uid"),
+        file_path           = first_saved_path or "",
+        file_name           = f"{file_count} DICOM file(s)",
+        file_size_kb        = round(total_size_kb, 2),
+        thumbnail_path      = first_thumb,
+        study_folder        = study_folder_path,
+        num_files           = file_count,
+        uploader_id         = current_user.id,
+        status              = "CONFIRMED",
+        upload_date         = datetime.utcnow(),
+        # Mark it as already in Orthanc
+        sent_to_orthanc     = True,
+        orthanc_study_id    = orthanc_id,
+        orthanc_sent_at     = datetime.utcnow(),
+    )
+    db.add(study)
+    db.commit()
+    db.refresh(study)
+
+    return {
+        "success": True,
+        "message": f"Imported {file_count} file(s) from Orthanc into local PACS",
+        "study_id": study.id,
+        "patient_name": study.patient_name,
+        "num_files": file_count,
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -170,6 +170,41 @@ def download_dicom_from_orthanc(
         return False, str(exc), None
 
 
+def list_study_instances(
+    orthanc_study_id: str,
+    creds: Optional[Dict] = None,
+) -> Tuple[bool, str, List[str]]:
+    """Return the list of instance IDs belonging to an Orthanc study."""
+    try:
+        resp = _get(f"/studies/{orthanc_study_id}", creds=creds)
+        if resp.status_code != 200:
+            return False, f"HTTP {resp.status_code}", []
+        data = resp.json()
+        # Orthanc nests instances inside Series
+        instance_ids = []
+        for series_id in data.get("Series", []):
+            sr = _get(f"/series/{series_id}", creds=creds)
+            if sr.status_code == 200:
+                instance_ids.extend(sr.json().get("Instances", []))
+        return True, "OK", instance_ids
+    except Exception as exc:
+        return False, str(exc), []
+
+
+def download_instance_file(
+    instance_id: str,
+    creds: Optional[Dict] = None,
+) -> Tuple[bool, Optional[bytes]]:
+    """Download one DICOM instance file from Orthanc. Returns (success, bytes)."""
+    try:
+        resp = _get(f"/instances/{instance_id}/file", creds=creds)
+        if resp.status_code == 200:
+            return True, resp.content
+        return False, None
+    except Exception:
+        return False, None
+
+
 def check_orthanc_health(creds: Optional[Dict] = None) -> Dict[str, Any]:
     """Check if Orthanc is reachable and return its system information."""
     try:

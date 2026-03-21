@@ -295,28 +295,41 @@ async function loadOrthancStudies() {
     }
 
     container.innerHTML = `
-      <table class="table-modern">
+      <table class="table-modern" style="table-layout: fixed; width: 100%;">
         <thead>
           <tr>
-            <th>Patient Name</th>
-            <th>Patient ID</th>
-            <th>Study Date</th>
-            <th>Modality</th>
-            <th>Description</th>
-            <th>Orthanc ID</th>
+            <th style="width:20%">Patient Name</th>
+            <th style="width:15%">Study Date</th>
+            <th style="width:12%">Modality</th>
+            <th style="width:23%">Description</th>
+            <th style="width:30%">System Status / Action</th>
           </tr>
         </thead>
         <tbody>
-          ${studies.map(s => `
+          ${studies.map(s => {
+            let statusHtml;
+            if (s.sent_by_us) {
+              const uploader = s.sent_by_user ? escapeHtml(s.sent_by_user) : 'us';
+              statusHtml = `<span class="badge badge-green">✓ Sent by ${uploader}</span>
+                            <a href="#study/${s.local_study_id}" onclick="event.preventDefault(); navigateTo('study/${s.local_study_id}'); router();" class="text-xs" style="margin-left:0.5rem; color:var(--blue);">View Local →</a>`;
+            } else {
+              statusHtml = `<button class="btn btn-blue btn-sm" onclick="importStudyFromOrthanc('${s.orthanc_id}')">⬇️ Import to PACS</button>`;
+            }
+
+            return `
             <tr>
-              <td style="font-weight:600;">${escapeHtml(s.patient_name) || '—'}</td>
-              <td>${escapeHtml(s.patient_id) || '—'}</td>
+              <td style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(s.patient_name)}">
+                ${escapeHtml(s.patient_name) || '—'}
+              </td>
               <td>${formatDate(s.study_date)}</td>
               <td><span class="badge badge-blue">${escapeHtml(s.modality) || '—'}</span></td>
-              <td>${escapeHtml(s.study_description) || '—'}</td>
-              <td class="text-sm text-muted" style="font-family:monospace; word-break:break-all;">${escapeHtml(s.orthanc_id) || '—'}</td>
+              <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(s.study_description)}">
+                ${escapeHtml(s.study_description) || '—'}
+              </td>
+              <td>${statusHtml}</td>
             </tr>
-          `).join('')}
+            `;
+          }).join('')}
         </tbody>
       </table>
     `;
@@ -328,6 +341,18 @@ async function loadOrthancStudies() {
         <p>${escapeHtml(err.message)}</p>
       </div>
     `;
+  }
+}
+
+async function importStudyFromOrthanc(orthancId) {
+  showToast('Importing study, this may take a moment…', 'info');
+  try {
+    const res = await apiImportFromOrthanc(orthancId);
+    showToast(`✓ Imported: ${res.num_files} files for ${res.patient_name}`, 'success');
+    // Reload studies to update flags
+    loadOrthancStudies();
+  } catch (err) {
+    showToast(`✕ ${err.message}`, 'error');
   }
 }
 

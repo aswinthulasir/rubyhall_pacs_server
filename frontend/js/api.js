@@ -234,6 +234,15 @@ async function apiGetOrthancStudies() {
   return resp.json();
 }
 
+async function apiImportFromOrthanc(orthancId) {
+  const resp = await apiFetch(`/orthanc/import/${orthancId}`, { method: 'POST' });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.detail || 'Import failed');
+  }
+  return resp.json();
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    ORTHANC SERVER CREDENTIALS
    ═══════════════════════════════════════════════════════════════════════ */

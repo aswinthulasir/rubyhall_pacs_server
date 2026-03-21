@@ -150,12 +150,17 @@ class PdfReportOut(BaseModel):
 # ══════════════════════════════════════════════════════════════════════════════
 
 class OrthancStudySummary(BaseModel):
-    orthanc_id        : str
-    patient_name      : Optional[str]
-    patient_id        : Optional[str]
-    study_date        : Optional[str]
-    study_description : Optional[str]
-    modality          : Optional[str]
+    orthanc_id          : str
+    patient_name        : Optional[str]
+    patient_id          : Optional[str]
+    study_date          : Optional[str]
+    study_description   : Optional[str]
+    modality            : Optional[str]
+    study_instance_uid  : Optional[str] = None
+    # Flags for "sent by us"
+    sent_by_us          : bool = False
+    local_study_id      : Optional[int] = None
+    sent_by_user        : Optional[str] = None
 
 
 class SendOrthancResponse(BaseModel):
