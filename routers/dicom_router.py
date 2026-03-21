@@ -12,6 +12,7 @@ Other routes:
   GET  /dicom/thumbnail/{id}       — serve thumbnail image
   GET  /dicom/download/{id}        — download raw DICOM file
   DELETE /dicom/studies/{id}       — soft-delete study
+  POST /dicom/open-radiant/{id}   — push study to RadiAnt via C-STORE
   POST /dicom/upload-pdf/{study_id} — attach PDF report (doctors only)
 """
 
@@ -45,6 +46,7 @@ from services.dicom_service import (
 )
 import config
 import pydicom
+from services.radiant_service import send_to_radiant, collect_study_files
 
 router = APIRouter(prefix="/dicom", tags=["DICOM Studies"])
 
@@ -403,6 +405,32 @@ def delete_study(
 
     return {"message": f"Study {study_id} deleted successfully", "success": True}
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Open in RadiAnt (C-STORE push)
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.post("/open-radiant/{study_id}", response_model=MessageResponse)
+def open_in_radiant(
+    study_id     : int,
+    current_user : User    = Depends(get_current_user),
+    db           : Session = Depends(get_db),
+):
+    """Push all DICOM files for a study to RadiAnt Viewer via C-STORE."""
+    study = db.query(DicomStudy).filter(DicomStudy.id == study_id).first()
+    if not study:
+        raise HTTPException(404, "Study not found")
+
+    files = collect_study_files(study)
+    if not files:
+        raise HTTPException(404, "No DICOM files found on disk for this study")
+
+    success, message, num_sent = send_to_radiant(files)
+
+    if not success:
+        raise HTTPException(503, message)
+
+    return {"message": message, "success": True}
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  PDF Report Upload (doctors only)

@@ -210,6 +210,19 @@ async function apiUploadPdf(studyId, pdfFile, notes) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   RADIANT VIEWER (C-STORE)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+async function apiOpenInRadiant(studyId) {
+  const resp = await apiFetch(`/dicom/open-radiant/${studyId}`, { method: 'POST' });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.detail || 'Failed to send to RadiAnt');
+  }
+  return resp.json();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    ORTHANC
    ═══════════════════════════════════════════════════════════════════════ */
 

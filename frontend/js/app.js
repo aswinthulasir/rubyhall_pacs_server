@@ -121,6 +121,18 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+/* ── Open in RadiAnt (C-STORE push) ────────────────────────────────────── */
+async function openInRadiant(studyId, event) {
+  if (event) { event.preventDefault(); event.stopPropagation(); }
+  showToast('Sending to RadiAnt…', 'info');
+  try {
+    const res = await apiOpenInRadiant(studyId);
+    showToast(`✓ ${res.message}`, 'success');
+  } catch (err) {
+    showToast(`✕ RadiAnt: ${err.message}`, 'error');
+  }
+}
+
 /* ── Main SPA router ────────────────────────────────────────────────────── */
 async function router() {
   const app = document.getElementById('app');

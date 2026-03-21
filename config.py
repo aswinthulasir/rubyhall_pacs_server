@@ -35,3 +35,9 @@ ROLES = {
     4: "patient",
     5: "radiologist",
 }
+
+# ─── RadiAnt DICOM Viewer (C-STORE SCP) ───────────────────────────────────────
+RADIANT_AE_TITLE = os.getenv("RADIANT_AE_TITLE", "RADIANT")
+RADIANT_HOST     = os.getenv("RADIANT_HOST", "127.0.0.1")
+RADIANT_PORT     = int(os.getenv("RADIANT_PORT", "11113"))
+SCU_AE_TITLE     = os.getenv("SCU_AE_TITLE", "HOSPITAL_PACS")

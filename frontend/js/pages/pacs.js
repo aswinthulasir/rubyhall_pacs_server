@@ -122,7 +122,12 @@ function renderPacsStudyCard(study) {
       ${pdfSection}
       <div class="pacs-card-footer">
         <span class="text-muted text-sm">Study #${study.id}</span>
-        <span class="btn btn-blue btn-sm" style="pointer-events:none;">View Details →</span>
+        <span style="display:flex; gap:0.5rem; align-items:center;">
+          <button class="btn btn-blue btn-sm" style="padding:0.25rem 0.6rem; font-size:0.78rem;"
+                  onclick="event.preventDefault(); event.stopPropagation(); openInRadiant(${study.id}, event)"
+                  title="Open in RadiAnt">🩻 RadiAnt</button>
+          <span class="btn btn-blue btn-sm" style="pointer-events:none;">View Details →</span>
+        </span>
       </div>
     </a>
   `;

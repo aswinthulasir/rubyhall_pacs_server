@@ -14,9 +14,14 @@ python-jose[cryptography]  # JWT encoding / decoding
 pydicom                # read / write DICOM files
 numpy                 # pixel array manipulation
 Pillow                # thumbnail generation (PNG/JPEG)
+pylibjpeg             # DICOM pixel data decoding framework
+pyjpegls              # JPEG-LS codec (needed for compressed CT scans)
 
 # ─── HTTP Client (for Orthanc calls) ──────────────────────────────────────────
 httpx
+
+# ─── DICOM Networking (C-STORE to RadiAnt) ────────────────────────────────────
+pynetdicom
 
 # ─── Utilities ────────────────────────────────────────────────────────────────
 pydantic[email]    # request / response validation (with email support)

@@ -148,9 +148,13 @@ function renderStudyDetail(container, study) {
                   ${study.sent_to_orthanc ? 'disabled title="Already sent"' : ''}>
             🟢 ${study.sent_to_orthanc ? 'Sent to Orthanc' : 'Send to Orthanc'}
           </button>
-          <button class="btn btn-blue" onclick="downloadAuthFile('/dicom/download/${study.id}', '${escapeHtml(study.file_name) || 'study.dcm'}')"
-                  title="Save the file, then drag and drop it onto RadiAnt Viewer">
-            🔵 Download for RadiAnt
+          <button class="btn btn-blue" onclick="openInRadiant(${study.id}, event)"
+                  title="Push study to RadiAnt Viewer via C-STORE">
+            🩻 Open in RadiAnt
+          </button>
+          <button class="btn btn-outline" onclick="event.stopPropagation(); downloadAuthFile('/dicom/download/${study.id}', '${escapeHtml(study.file_name) || 'study.dcm'}')"
+                  title="Download DICOM file to disk">
+            ⬇️ Download
           </button>
           <button class="btn btn-red" id="btn-delete-study"
                   onclick="confirmDeleteStudy(${study.id})">

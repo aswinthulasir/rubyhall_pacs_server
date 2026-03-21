@@ -292,6 +292,7 @@ function renderStudyCard(study) {
         ${study.sent_to_orthanc
           ? '<span class="badge badge-green">✓ Orthanc</span>'
           : '<span class="badge badge-gray">Local only</span>'}
+        <button class="btn btn-blue btn-sm" onclick="openInRadiant(${study.id}, event)" title="Open in RadiAnt">🩻 RadiAnt</button>
         <span class="btn btn-blue btn-sm">View →</span>
       </div>
     </div>
