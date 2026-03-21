@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Secure Payment</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f0f2f7;
+      --card-bg: #ffffff;
+      --text-primary: #0d1117;
+      --text-secondary: #6b7280;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --border: #e5e7eb;
+      --input-bg: #f9fafb;
+      --success: #10b981;
+      --error: #ef4444;
+      --shadow: 0 4px 32px rgba(0,0,0,0.08);
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-image: radial-gradient(ellipse at 20% 50%, rgba(37,99,235,0.07) 0%, transparent 60%),
+                        radial-gradient(ellipse at 80% 20%, rgba(16,185,129,0.05) 0%, transparent 50%);
+    }
+
+    .wrapper {
+      width: 100%;
+      max-width: 420px;
+      padding: 24px 16px;
+    }
+
+    /* ── Secure badge ── */
+    .secure-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      margin-bottom: 16px;
+      justify-content: center;
+      letter-spacing: 0.3px;
+    }
+    .secure-badge svg { color: var(--success); }
+
+    /* ── Card ── */
+    .payment-card {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 36px 32px 32px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,0.9);
+    }
+
+    /* ── Amount banner ── */
+    .amount-banner {
+      background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+      border-radius: 14px;
+      padding: 16px 20px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .amount-label { font-size: 12px; color: rgba(255,255,255,0.7); font-weight: 500; margin-bottom: 4px; }
+    .amount-value { font-size: 26px; font-weight: 700; color: #fff; font-family: 'Space Mono', monospace; }
+    .amount-value span { font-size: 15px; font-weight: 400; }
+    .lock-icon { background: rgba(255,255,255,0.15); border-radius: 10px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; }
+
+    /* ── Heading ── */
+    h1 { font-size: 22px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+    .subtitle { font-size: 13.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 28px; }
+
+    /* ── Form ── */
+    .field { margin-bottom: 18px; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 7px;
+      letter-spacing: 0.1px;
+    }
+
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-wrap input {
+      width: 100%;
+      padding: 12px 14px 12px 44px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 15px;
+      font-family: 'Space Mono', monospace;
+      color: var(--text-primary);
+      background: var(--input-bg);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      letter-spacing: 0.5px;
+    }
+    .input-wrap input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+      background: #fff;
+    }
+    .input-icon {
+      position: absolute;
+      left: 13px;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+    }
+
+    /* card brand logos */
+    .card-logo {
+      position: absolute;
+      left: 12px;
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .mc-circle { width: 18px; height: 18px; border-radius: 50%; }
+    .mc-red  { background: #eb001b; }
+    .mc-orange { background: #f79e1b; margin-left: -8px; opacity: 0.9; }
+
+    /* row for expiry + cvc */
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    /* no-icon input */
+    .plain-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 15px;
+      font-family: 'Space Mono', monospace;
+      color: var(--text-secondary);
+      background: var(--input-bg);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .plain-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+      background: #fff;
+      color: var(--text-primary);
+    }
+
+    /* discount row */
+    .discount-row { display: flex; gap: 10px; align-items: center; }
+    .discount-row .plain-input { flex: 1; color: var(--text-secondary); }
+    .apply-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0 4px;
+      font-family: 'DM Sans', sans-serif;
+      transition: color 0.2s;
+      white-space: nowrap;
+    }
+    .apply-btn:hover { color: var(--accent-hover); }
+
+    /* ── Pay button ── */
+    .pay-btn {
+      width: 100%;
+      padding: 15px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.2s, transform 0.12s, box-shadow 0.2s;
+      box-shadow: 0 4px 14px rgba(37,99,235,0.35);
+      position: relative;
+      overflow: hidden;
+      letter-spacing: 0.2px;
+    }
+    .pay-btn:hover { background: var(--accent-hover); box-shadow: 0 6px 20px rgba(37,99,235,0.4); }
+    .pay-btn:active { transform: scale(0.98); }
+    .pay-btn .btn-ripple {
+      position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      transform: scale(0); animation: ripple 0.6s linear;
+      pointer-events: none;
+    }
+    @keyframes ripple { to { transform: scale(4); opacity: 0; } }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    /* ══════════════════════════════
+       SUCCESS MODAL
+    ══════════════════════════════ */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 999;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.35s ease;
+    }
+    .modal-overlay.show { opacity: 1; pointer-events: all; }
+
+    .modal-box {
+      background: linear-gradient(145deg, #059669, #10b981);
+      border-radius: 24px;
+      padding: 48px 40px 40px;
+      text-align: center;
+      width: 340px;
+      max-width: 90vw;
+      box-shadow: 0 24px 60px rgba(16,185,129,0.4);
+      transform: scale(0.7) translateY(30px);
+      opacity: 0;
+      transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.35s ease;
+    }
+    .modal-overlay.show .modal-box {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+
+    /* tick circle */
+    .tick-circle {
+      width: 84px; height: 84px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px;
+      position: relative;
+    }
+    .tick-circle::before {
+      content: '';
+      position: absolute; inset: -4px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.4);
+      animation: pulse-ring 1.5s ease-out infinite;
+    }
+    @keyframes pulse-ring {
+      0% { transform: scale(1); opacity: 0.6; }
+      100% { transform: scale(1.3); opacity: 0; }
+    }
+
+    /* SVG tick draw-on */
+    .tick-svg { width: 44px; height: 44px; }
+    .tick-path {
+      stroke: #fff; stroke-width: 3.5;
+      stroke-linecap: round; stroke-linejoin: round;
+      fill: none;
+      stroke-dasharray: 60;
+      stroke-dashoffset: 60;
+      transition: stroke-dashoffset 0.6s ease 0.3s;
+    }
+    .modal-overlay.show .tick-path { stroke-dashoffset: 0; }
+
+    .modal-title {
+      font-size: 22px; font-weight: 700; color: #fff;
+      margin-bottom: 8px;
+    }
+    .modal-sub {
+      font-size: 14px; color: rgba(255,255,255,0.82);
+      line-height: 1.6; margin-bottom: 8px;
+    }
+    .modal-amount {
+      font-family: 'Space Mono', monospace;
+      font-size: 28px; font-weight: 700; color: #fff;
+      margin: 12px 0 24px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 10px; padding: 10px 20px;
+      display: inline-block;
+    }
+    .modal-ref {
+      font-size: 11.5px; color: rgba(255,255,255,0.65);
+      font-family: 'Space Mono', monospace;
+      margin-bottom: 28px;
+    }
+    .modal-close {
+      background: rgba(255,255,255,0.2);
+      border: 1.5px solid rgba(255,255,255,0.4);
+      color: #fff;
+      font-size: 15px; font-weight: 600;
+      padding: 12px 32px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: background 0.2s;
+    }
+    .modal-close:hover { background: rgba(255,255,255,0.3); }
+
+    /* confetti dots */
+    .confetti-dot {
+      position: absolute;
+      width: 8px; height: 8px;
+      border-radius: 2px;
+      animation: confetti-fall 1.2s ease-out forwards;
+    }
+    @keyframes confetti-fall {
+      0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+      100% { transform: translateY(100px) rotate(360deg); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- Secure badge -->
+  <div class="secure-badge">
+    <svg width="13" height="13" fill="currentColor" viewBox="0 0 20 20">
+      <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd"/>
+    </svg>
+    256-bit SSL Encrypted &nbsp;·&nbsp; Secure Checkout
+  </div>
+
+  <div class="payment-card">
+
+    <!-- Amount banner -->
+    <div class="amount-banner">
+      <div>
+        <div class="amount-label">Amount to pay</div>
+        <div class="amount-value"><span>₹ </span>1,299.00</div>
+      </div>
+      <div class="lock-icon">
+        <svg width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+        </svg>
+      </div>
+    </div>
+
+    <h1>Final step, make the payment.</h1>
+    <p class="subtitle">To finalize your subscription, kindly complete your payment using a valid credit card.</p>
+
+    <!-- Card number -->
+    <div class="field">
+      <label>Card number</label>
+      <div class="input-wrap">
+        <div class="card-logo input-icon">
+          <div class="mc-circle mc-red"></div>
+          <div class="mc-circle mc-orange"></div>
+        </div>
+        <input type="text" id="cardNum" maxlength="19" value="9870 8880 8880 8880" placeholder="0000 0000 0000 0000" style="padding-left: 52px;" />
+      </div>
+    </div>
+
+    <!-- Expiry + CVC -->
+    <div class="row">
+      <div class="field">
+        <label>Expiry</label>
+        <input class="plain-input" type="text" id="expiry" maxlength="5" value="16 / 26" placeholder="MM / YY" />
+      </div>
+      <div class="field">
+        <label>CVC</label>
+        <div class="input-wrap">
+          <div class="input-icon">
+            <svg width="16" height="16" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+            </svg>
+          </div>
+          <input type="password" id="cvc" maxlength="3" placeholder="x x x" style="padding-left: 38px; letter-spacing: 4px;" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Cardholder name -->
+    <div class="field">
+      <label>Cardholder name</label>
+      <input class="plain-input" type="text" placeholder="RAHUL MENON" value="RAHUL MENON" style="font-family: 'DM Sans', sans-serif; text-transform: uppercase; letter-spacing: 1px;" />
+    </div>
+
+    <!-- Discount code -->
+    <div class="field">
+      <label>Discount code</label>
+      <div class="discount-row">
+        <input class="plain-input" type="text" id="discount" placeholder="C00-20-OFF" />
+        <button class="apply-btn" onclick="applyCode()">Apply</button>
+      </div>
+    </div>
+
+    <!-- Pay button -->
+    <button class="pay-btn" id="payBtn" onclick="handlePay(event)">
+      Pay ₹1,299 now
+    </button>
+
+    <div class="footer">
+      <svg width="12" height="12" fill="#9ca3af" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clip-rule="evenodd"/>
+      </svg>
+      Your payment is protected by end-to-end encryption
+    </div>
+
+  </div>
+</div>
+
+<!-- ── SUCCESS MODAL ── -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box" id="modalBox">
+
+    <div class="tick-circle" id="tickCircle">
+      <svg class="tick-svg" viewBox="0 0 50 50">
+        <polyline class="tick-path" points="10,27 21,38 40,14"/>
+      </svg>
+    </div>
+
+    <div class="modal-title">Payment Successful!</div>
+    <div class="modal-sub">Your subscription has been activated.<br>A confirmation has been sent to your email.</div>
+    <div class="modal-amount">₹ 1,299.00</div>
+    <div class="modal-ref" id="modalRef">Ref: TXN-XXXX-XXXX</div>
+
+    <button class="modal-close" onclick="closeModal()">Done</button>
+  </div>
+</div>
+
+<script>
+  /* ── Card number formatter ── */
+  document.getElementById('cardNum').addEventListener('input', function(e) {
+    let v = e.target.value.replace(/\D/g, '').substring(0, 16);
+    e.target.value = v.match(/.{1,4}/g)?.join(' ') || v;
+  });
+
+  document.getElementById('expiry').addEventListener('input', function(e) {
+    let v = e.target.value.replace(/\D/g, '').substring(0, 4);
+    if (v.length >= 2) v = v.substring(0,2) + ' / ' + v.substring(2);
+    e.target.value = v;
+  });
+
+  document.getElementById('cvc').addEventListener('input', function(e) {
+    e.target.value = e.target.value.replace(/\D/g,'').substring(0,3);
+  });
+
+  /* ── Apply discount ── */
+  function applyCode() {
+    const inp = document.getElementById('discount');
+    if (!inp.value.trim()) return;
+    const btn = document.querySelector('.apply-btn');
+    btn.textContent = '✓ Applied';
+    btn.style.color = '#10b981';
+    inp.style.borderColor = '#10b981';
+  }
+
+  /* ── Generate random ref ── */
+  function randomRef() {
+    const hex = () => Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4,'0');
+    return `TXN-${hex()}-${hex()}`;
+  }
+
+  /* ── Confetti ── */
+  function spawnConfetti(box) {
+    const colors = ['#fff','#fcd34d','#a7f3d0','#bfdbfe','#fca5a5'];
+    for (let i = 0; i < 18; i++) {
+      const dot = document.createElement('div');
+      dot.className = 'confetti-dot';
+      dot.style.cssText = `
+        left: ${Math.random()*80+10}%;
+        top: ${Math.random()*40}%;
+        background: ${colors[Math.floor(Math.random()*colors.length)]};
+        animation-delay: ${Math.random()*0.4}s;
+        animation-duration: ${0.9 + Math.random()*0.5}s;
+        transform: rotate(${Math.random()*360}deg);
+        width: ${5+Math.random()*6}px;
+        height: ${5+Math.random()*6}px;
+      `;
+      box.style.position = 'relative';
+      box.appendChild(dot);
+      dot.addEventListener('animationend', () => dot.remove());
+    }
+  }
+
+  /* ── Pay button ── */
+  function handlePay(e) {
+    /* Ripple effect */
+    const btn = document.getElementById('payBtn');
+    const rect = btn.getBoundingClientRect();
+    const rip = document.createElement('span');
+    rip.className = 'btn-ripple';
+    const size = Math.max(rect.width, rect.height) * 2;
+    rip.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-rect.left-size/2}px;top:${e.clientY-rect.top-size/2}px`;
+    btn.appendChild(rip);
+    rip.addEventListener('animationend', () => rip.remove());
+
+    /* Loading state */
+    btn.textContent = 'Processing…';
+    btn.disabled = true;
+    btn.style.opacity = '0.8';
+
+    setTimeout(() => {
+      btn.textContent = 'Pay ₹1,299 now';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+
+      /* Show modal */
+      document.getElementById('modalRef').textContent = 'Ref: ' + randomRef();
+      const overlay = document.getElementById('modalOverlay');
+      overlay.classList.add('show');
+      setTimeout(() => spawnConfetti(document.getElementById('modalBox')), 400);
+    }, 1800);
+  }
+
+  /* ── Close modal ── */
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.remove('show');
+    // Notify the opener (main PACS tab) that payment succeeded
+    if (window.opener) {
+      window.opener.postMessage({ type: 'payment-success' }, '*');
+    }
+    // Auto-close this payment tab after a brief moment
+    setTimeout(() => { window.close(); }, 600);
+  }
+
+  /* Close on backdrop click */
+  document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+</script>
+</body>
+</html>

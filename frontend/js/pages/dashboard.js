@@ -163,9 +163,9 @@ function renderPreview(data, isDoctor) {
         </div>
       </div>
       <div class="action-bar">
-        <button class="btn btn-red" id="btn-cancel-preview" onclick="cancelPreview()">🔴 Cancel</button>
+        <button class="btn btn-red" id="btn-cancel-preview" onclick="cancelPreview()">Cancel</button>
         <button class="btn btn-green btn-lg" id="btn-confirm" onclick="confirmBatch()">
-          🟢 Save to PACS
+          Save to PACS
         </button>
       </div>
     </div>
@@ -186,7 +186,38 @@ function cancelPreview() {
 
 async function confirmBatch() {
   const btn = document.getElementById('btn-confirm');
+  btn.disabled = true;
+  btn.innerHTML = '💳 Awaiting payment…';
 
+  // Open payment page in a new window
+  const payWin = window.open('/frontend/payment.html', '_blank');
+
+  // Listen for the payment-success message from the payment window
+  function onPaymentMessage(event) {
+    if (event.data && event.data.type === 'payment-success') {
+      window.removeEventListener('message', onPaymentMessage);
+      clearInterval(pollClosed);
+      _doConfirmBatch(btn);
+    }
+  }
+  window.addEventListener('message', onPaymentMessage);
+
+  // Also watch if user closes the payment window without paying
+  const pollClosed = setInterval(() => {
+    if (payWin && payWin.closed) {
+      clearInterval(pollClosed);
+      window.removeEventListener('message', onPaymentMessage);
+      // Check if confirm already ran — if not, re-enable button
+      if (btn.disabled && btn.innerHTML.includes('payment')) {
+        btn.disabled = false;
+        btn.innerHTML = 'Save to PACS';
+        showToast('Payment cancelled — study not saved', 'warning');
+      }
+    }
+  }, 500);
+}
+
+async function _doConfirmBatch(btn) {
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Saving All…';
 
@@ -221,7 +252,7 @@ async function confirmBatch() {
   } catch (err) {
     showToast(err.message, 'error');
     btn.disabled = false;
-    btn.innerHTML = '🟢 Save All to PACS';
+    btn.innerHTML = 'Save All to PACS';
   }
 }
 

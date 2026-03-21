@@ -146,7 +146,7 @@ function renderStudyDetail(container, study) {
           <button class="btn btn-green" id="btn-send-orthanc"
                   onclick="sendStudyToOrthanc(${study.id})"
                   ${study.sent_to_orthanc ? 'disabled title="Already sent"' : ''}>
-            🟢 ${study.sent_to_orthanc ? 'Sent to Orthanc' : 'Send to Orthanc'}
+             ${study.sent_to_orthanc ? 'Sent to Orthanc' : 'Send to Orthanc'}
           </button>
           <button class="btn btn-blue" onclick="openInRadiant(${study.id}, event)"
                   title="Push study to RadiAnt Viewer via C-STORE">
@@ -158,7 +158,7 @@ function renderStudyDetail(container, study) {
           </button>
           <button class="btn btn-red" id="btn-delete-study"
                   onclick="confirmDeleteStudy(${study.id})">
-            🔴 Delete
+            Delete
           </button>
         </div>
       </div>
@@ -184,12 +184,12 @@ async function sendStudyToOrthanc(studyId) {
     } else {
       showToast(result.message || 'Send failed', 'error');
       btn.disabled = false;
-      btn.innerHTML = '🟢 Send to Orthanc';
+      btn.innerHTML = 'Send to Orthanc';
     }
   } catch (err) {
     showToast(err.message, 'error');
     btn.disabled = false;
-    btn.innerHTML = '🟢 Send to Orthanc';
+    btn.innerHTML = 'Send to Orthanc';
   }
 }
 
@@ -199,7 +199,7 @@ function confirmDeleteStudy(studyId) {
   overlay.id = 'delete-modal';
   overlay.innerHTML = `
     <div class="modal-box">
-      <h3>🔴 Delete Study</h3>
+      <h3>Delete Study</h3>
       <p>Are you sure you want to delete this study? This will remove the DICOM file from disk. This action cannot be undone.</p>
       <div class="modal-actions">
         <button class="btn btn-outline" onclick="document.getElementById('delete-modal').remove()">
