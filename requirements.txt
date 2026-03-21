@@ -4,9 +4,7 @@ uvicorn[standard]
 python-multipart       # required for file/form uploads
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-sqlalchemy
-pymysql                # MySQL driver used by SQLAlchemy
-cryptography          # required by pymysql for secure connections
+sqlalchemy             # SQLite support is built-in — no extra drivers needed
 
 # ─── Authentication ───────────────────────────────────────────────────────────
 passlib[bcrypt]        # password hashing

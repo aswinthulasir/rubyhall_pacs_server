@@ -1,6 +1,6 @@
 /**
  * pages/pacs.js — Show PACS Page
- * Lists ALL uploaded studies from ALL users
+ * Lists ALL uploaded studies from ALL users with premium dark card design
  */
 
 async function renderPacsPage(container) {
@@ -60,48 +60,69 @@ async function loadAllPacsStudies() {
 
 function renderPacsStudyCard(study) {
   const pdfSection = study.pdf_reports && study.pdf_reports.length > 0
-    ? `<div style="margin-top:0.5rem; padding-top:0.5rem; border-top:1px solid var(--border-color);">
-         <div style="font-size:0.82rem; font-weight:600; margin-bottom:0.25rem;">📄 PDF Reports (${study.pdf_reports.length})</div>
+    ? `<div class="pacs-card-pdf">
+         <div class="pacs-card-pdf-title">📄 Reports (${study.pdf_reports.length})</div>
          ${study.pdf_reports.map(r => `
-           <div style="font-size:0.8rem; color: var(--text-muted);">
-             📄 ${escapeHtml(r.file_name) || 'report.pdf'}
-             ${r.notes ? ` — <em>${escapeHtml(r.notes)}</em>` : ''}
+           <div class="pacs-card-pdf-item">
+             <span>📄 ${escapeHtml(r.file_name) || 'report.pdf'}${r.notes ? ` — <em>${escapeHtml(r.notes)}</em>` : ''}</span>
+             <span class="pacs-card-pdf-actions">
+               <button class="btn btn-blue btn-sm" style="padding:0.2rem 0.6rem; font-size:0.72rem;" title="View PDF"
+                       onclick="event.preventDefault(); event.stopPropagation(); openAuthPdf('${r.file_url}', '${escapeHtml(r.file_name) || 'report.pdf'}')">
+                 👁️ View
+               </button>
+               <button class="btn btn-outline btn-sm" style="padding:0.2rem 0.5rem; font-size:0.72rem;" title="Download PDF"
+                       onclick="event.preventDefault(); event.stopPropagation(); downloadAuthFile('${r.file_url}', '${escapeHtml(r.file_name) || 'report.pdf'}')">
+                 ⬇️
+               </button>
+             </span>
            </div>
          `).join('')}
        </div>`
     : '';
 
   return `
-    <a href="#study/${study.id}" class="study-card">
-      <div class="study-card-thumb">
+    <a href="#study/${study.id}" class="pacs-card" style="text-decoration:none; color:inherit;">
+      <div class="pacs-card-thumb">
         ${study.thumbnail_url
           ? `<img data-auth-src="${study.thumbnail_url}" alt="Thumb" class="auth-img"
                    onerror="this.parentElement.innerHTML='<div class=\\'thumb-placeholder\\'>🩻</div>'">`
           : '<div class="thumb-placeholder">🩻</div>'}
       </div>
-      <div class="study-card-info">
-        <div class="study-card-name">${escapeHtml(study.patient_name) || 'Unknown Patient'}</div>
-        <div class="study-card-meta">
-          <span class="badge badge-blue">${escapeHtml(study.modality) || '—'}</span>
-          <span>MR: <strong>${escapeHtml(study.mr_number)}</strong></span>
+      <div class="pacs-card-body">
+        <div class="pacs-card-patient">${escapeHtml(study.patient_name) || 'Unknown Patient'}</div>
+
+        <div class="pacs-card-row">
+          <span class="icon">👤</span>
+          <span>${escapeHtml(study.patient_age) || '—'} · ${escapeHtml(study.patient_sex) || '—'}</span>
+          <span class="badge badge-blue" style="margin-left:auto;">${escapeHtml(study.modality) || '—'}</span>
         </div>
-        <div class="study-card-meta">
-          <span>📁 ${study.num_files || 1} file(s)</span>
-          <span>${formatFileSize(study.file_size_kb)}</span>
+
+        <div class="pacs-card-row">
+          <span class="icon">📁</span>
+          <span>${study.num_files || 1} file(s) · ${formatFileSize(study.file_size_kb)}</span>
         </div>
-        <div class="study-card-meta" style="margin-top:0.25rem;">
-          <span>📅 ${formatDateTime(study.upload_date)}</span>
+
+        <div class="pacs-card-row">
+          <span class="icon">📅</span>
+          <span>${formatDateTime(study.upload_date)}</span>
         </div>
-        <div class="study-card-meta" style="margin-top:0.25rem; color: var(--blue);">
-          <span>👤 Uploaded by: <strong>${escapeHtml(study.uploader_name) || 'Unknown'}</strong></span>
+
+        <div class="pacs-card-row">
+          <span class="icon">👤</span>
+          <span style="color: var(--purple);">Uploaded by: <strong>${escapeHtml(study.uploader_name) || 'Unknown'}</strong></span>
         </div>
-        <div style="margin-top:0.35rem;">
+
+        <div class="pacs-card-badges">
           ${study.sent_to_orthanc
             ? '<span class="badge badge-green">✓ Sent to Orthanc</span>'
             : '<span class="badge badge-gray">Not sent</span>'}
           <span class="badge ${study.status === 'CONFIRMED' ? 'badge-green' : 'badge-yellow'}">${study.status}</span>
         </div>
-        ${pdfSection}
+      </div>
+      ${pdfSection}
+      <div class="pacs-card-footer">
+        <span class="text-muted text-sm">Study #${study.id}</span>
+        <span class="btn btn-blue btn-sm" style="pointer-events:none;">View Details →</span>
       </div>
     </a>
   `;

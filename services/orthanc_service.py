@@ -1,11 +1,9 @@
 """
 services/orthanc_service.py — Wrapper around Orthanc's REST API.
 
-Covers:
-  - Uploading a DICOM file to Orthanc (/instances)
-  - Listing studies stored in Orthanc (/studies)
-  - Retrieving detailed study metadata from Orthanc
-  - Downloading a DICOM instance from Orthanc
+Now supports **dynamic credentials** so different users can connect to
+different Orthanc servers. Falls back to the config-level defaults when
+no explicit credentials are provided.
 """
 
 import logging
@@ -17,27 +15,35 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# Base auth tuple reused across every call
-_AUTH = (config.ORTHANC_USERNAME, config.ORTHANC_PASSWORD)
 _TIMEOUT = httpx.Timeout(30.0, connect=10.0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Internal helpers
+#  Internal helpers — now accept dynamic connection info
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _get(path: str) -> httpx.Response:
-    url = f"{config.ORTHANC_URL}{path}"
-    return httpx.get(url, auth=_AUTH, timeout=_TIMEOUT)
+def _build_auth(creds: Optional[Dict] = None):
+    if creds:
+        return (creds.get("username", ""), creds.get("password", ""))
+    return (config.ORTHANC_USERNAME, config.ORTHANC_PASSWORD)
 
 
-def _post_bytes(path: str, data: bytes, content_type: str = "application/dicom") -> httpx.Response:
-    url = f"{config.ORTHANC_URL}{path}"
+def _build_url(path: str, creds: Optional[Dict] = None) -> str:
+    base = creds["url"] if creds else config.ORTHANC_URL
+    return f"{base.rstrip('/')}{path}"
+
+
+def _get(path: str, creds: Optional[Dict] = None) -> httpx.Response:
+    return httpx.get(_build_url(path, creds), auth=_build_auth(creds), timeout=_TIMEOUT)
+
+
+def _post_bytes(path: str, data: bytes, content_type: str = "application/dicom",
+                creds: Optional[Dict] = None) -> httpx.Response:
     return httpx.post(
-        url,
+        _build_url(path, creds),
         content=data,
         headers={"Content-Type": content_type},
-        auth=_AUTH,
+        auth=_build_auth(creds),
         timeout=_TIMEOUT,
     )
 
@@ -46,7 +52,10 @@ def _post_bytes(path: str, data: bytes, content_type: str = "application/dicom")
 #  Public API
 # ══════════════════════════════════════════════════════════════════════════════
 
-def upload_to_orthanc(dicom_file_path: str) -> Tuple[bool, str, Optional[str], Optional[str]]:
+def upload_to_orthanc(
+    dicom_file_path: str,
+    creds: Optional[Dict] = None,
+) -> Tuple[bool, str, Optional[str], Optional[str]]:
     """
     Upload a local DICOM file to Orthanc.
 
@@ -57,7 +66,7 @@ def upload_to_orthanc(dicom_file_path: str) -> Tuple[bool, str, Optional[str], O
         with open(dicom_file_path, "rb") as f:
             dicom_bytes = f.read()
 
-        resp = _post_bytes("/instances", dicom_bytes)
+        resp = _post_bytes("/instances", dicom_bytes, creds=creds)
 
         if resp.status_code in (200, 201):
             data             = resp.json()
@@ -74,7 +83,8 @@ def upload_to_orthanc(dicom_file_path: str) -> Tuple[bool, str, Optional[str], O
         logger.error(msg)
         return False, msg, None, None
     except httpx.ConnectError:
-        msg = "Cannot connect to Orthanc at " + config.ORTHANC_URL
+        base = creds["url"] if creds else config.ORTHANC_URL
+        msg = "Cannot connect to Orthanc at " + base
         logger.error(msg)
         return False, msg, None, None
     except Exception as exc:
@@ -82,16 +92,14 @@ def upload_to_orthanc(dicom_file_path: str) -> Tuple[bool, str, Optional[str], O
         return False, str(exc), None, None
 
 
-def list_orthanc_studies() -> Tuple[bool, str, List[Dict[str, Any]]]:
+def list_orthanc_studies(
+    creds: Optional[Dict] = None,
+) -> Tuple[bool, str, List[Dict[str, Any]]]:
     """
     Retrieve all studies currently stored in Orthanc.
-
-    Returns:
-        (success, message, list_of_study_summaries)
     """
     try:
-        # Get list of study IDs
-        resp = _get("/studies")
+        resp = _get("/studies", creds=creds)
         if resp.status_code != 200:
             return False, f"Orthanc returned HTTP {resp.status_code}", []
 
@@ -99,7 +107,7 @@ def list_orthanc_studies() -> Tuple[bool, str, List[Dict[str, Any]]]:
         studies = []
 
         for sid in study_ids:
-            detail_resp = _get(f"/studies/{sid}")
+            detail_resp = _get(f"/studies/{sid}", creds=creds)
             if detail_resp.status_code != 200:
                 continue
 
@@ -121,7 +129,8 @@ def list_orthanc_studies() -> Tuple[bool, str, List[Dict[str, Any]]]:
         return True, f"Retrieved {len(studies)} studies from Orthanc", studies
 
     except httpx.ConnectError:
-        msg = "Cannot connect to Orthanc at " + config.ORTHANC_URL
+        base = creds["url"] if creds else config.ORTHANC_URL
+        msg = "Cannot connect to Orthanc at " + base
         logger.error(msg)
         return False, msg, []
     except Exception as exc:
@@ -129,12 +138,13 @@ def list_orthanc_studies() -> Tuple[bool, str, List[Dict[str, Any]]]:
         return False, str(exc), []
 
 
-def get_orthanc_study_detail(orthanc_study_id: str) -> Tuple[bool, str, Optional[Dict]]:
-    """
-    Retrieve full metadata for a single study from Orthanc.
-    """
+def get_orthanc_study_detail(
+    orthanc_study_id: str,
+    creds: Optional[Dict] = None,
+) -> Tuple[bool, str, Optional[Dict]]:
+    """Retrieve full metadata for a single study from Orthanc."""
     try:
-        resp = _get(f"/studies/{orthanc_study_id}")
+        resp = _get(f"/studies/{orthanc_study_id}", creds=creds)
         if resp.status_code == 200:
             return True, "OK", resp.json()
         return False, f"HTTP {resp.status_code}", None
@@ -144,13 +154,13 @@ def get_orthanc_study_detail(orthanc_study_id: str) -> Tuple[bool, str, Optional
         return False, str(exc), None
 
 
-def download_dicom_from_orthanc(orthanc_instance_id: str) -> Tuple[bool, str, Optional[bytes]]:
-    """
-    Download the raw DICOM bytes for a specific instance from Orthanc.
-    Used to proxy the file to the frontend for local RadiAnt viewing.
-    """
+def download_dicom_from_orthanc(
+    orthanc_instance_id: str,
+    creds: Optional[Dict] = None,
+) -> Tuple[bool, str, Optional[bytes]]:
+    """Download the raw DICOM bytes for a specific instance from Orthanc."""
     try:
-        resp = _get(f"/instances/{orthanc_instance_id}/file")
+        resp = _get(f"/instances/{orthanc_instance_id}/file", creds=creds)
         if resp.status_code == 200:
             return True, "OK", resp.content
         return False, f"HTTP {resp.status_code}", None
@@ -160,12 +170,10 @@ def download_dicom_from_orthanc(orthanc_instance_id: str) -> Tuple[bool, str, Op
         return False, str(exc), None
 
 
-def check_orthanc_health() -> Dict[str, Any]:
-    """
-    Check if Orthanc is reachable and return its system information.
-    """
+def check_orthanc_health(creds: Optional[Dict] = None) -> Dict[str, Any]:
+    """Check if Orthanc is reachable and return its system information."""
     try:
-        resp = _get("/system")
+        resp = _get("/system", creds=creds)
         if resp.status_code == 200:
             data = resp.json()
             return {

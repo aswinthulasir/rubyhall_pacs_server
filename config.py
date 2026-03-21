@@ -3,26 +3,20 @@ config.py — Central configuration for Hospital PACS System.
 All environment-level settings live here.
 """
 
-from urllib.parse import quote_plus
-
+import os
 
 # ─── Database ──────────────────────────────────────────────────────────────────
-DB_USER     = "root"
-DB_PASSWORD = quote_plus("Aswin2000")   # URL-safe encoding
-DB_HOST     = "localhost"
-DB_PORT     = 3306
-DB_NAME     = "hospital_pacs"
-
-DATABASE_URL = (
-    f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
-)
+# SQLite — no external DB server required. The .db file is created automatically.
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+DB_PATH      = os.path.join(BASE_DIR, "hospital_pacs.db")
+DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 # ─── JWT Authentication ─────────────────────────────────────────────────────────
 SECRET_KEY                  = "HospitalPACS_SuperSecretKey_ChangeMeInProduction!"
 ALGORITHM                   = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24   # 24 hours
 
-# ─── Orthanc ───────────────────────────────────────────────────────────────────
+# ─── Default Orthanc (used as fallback when no user-level credentials exist) ──
 ORTHANC_URL      = "http://localhost:8042"
 ORTHANC_USERNAME = "admin"
 ORTHANC_PASSWORD = "password"

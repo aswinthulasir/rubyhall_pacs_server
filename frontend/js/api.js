@@ -111,9 +111,8 @@ async function apiGetRoles() {
    DICOM STUDIES
    ═══════════════════════════════════════════════════════════════════════ */
 
-async function apiUploadDicomMulti(mrNumber, dicomFiles) {
+async function apiUploadDicomMulti(dicomFiles) {
   const form = new FormData();
-  form.append('mr_number', mrNumber);
   
   // Handle single file or array/FileList
   if (dicomFiles instanceof FileList || Array.isArray(dicomFiles)) {
@@ -133,7 +132,7 @@ async function apiUploadDicomMulti(mrNumber, dicomFiles) {
     const data = await resp.json().catch(() => ({}));
     throw new Error(data.detail || 'Upload failed');
   }
-  return resp.json();  // Returns a single preview object now
+  return resp.json();
 }
 
 async function apiConfirmStudy(studyId, mrNumber) {
@@ -148,10 +147,9 @@ async function apiConfirmStudy(studyId, mrNumber) {
   return resp.json();
 }
 
-async function apiConfirmBatch(mrNumber) {
+async function apiConfirmBatch() {
   const resp = await apiFetch('/dicom/confirm-batch', {
     method: 'POST',
-    body: JSON.stringify({ mr_number: mrNumber }),
   });
   if (!resp.ok) {
     const data = await resp.json().catch(() => ({}));
@@ -237,12 +235,72 @@ async function apiGetOrthancStudies() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   ORTHANC SERVER CREDENTIALS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+async function apiGetOrthancServers() {
+  const resp = await apiFetch('/orthanc/servers');
+  if (!resp.ok) throw new Error('Could not load servers');
+  return resp.json();
+}
+
+async function apiCreateOrthancServer(payload) {
+  const resp = await apiFetch('/orthanc/servers', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.detail || 'Failed to add server');
+  }
+  return resp.json();
+}
+
+async function apiUpdateOrthancServer(serverId, payload) {
+  const resp = await apiFetch(`/orthanc/servers/${serverId}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.detail || 'Failed to update server');
+  }
+  return resp.json();
+}
+
+async function apiDeleteOrthancServer(serverId) {
+  const resp = await apiFetch(`/orthanc/servers/${serverId}`, { method: 'DELETE' });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.detail || 'Failed to delete server');
+  }
+  return resp.json();
+}
+
+async function apiTestOrthancServer(serverId) {
+  const resp = await apiFetch(`/orthanc/servers/${serverId}/test`, { method: 'POST' });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.detail || 'Test failed');
+  }
+  return resp.json();
+}
+
+async function apiActivateOrthancServer(serverId) {
+  const resp = await apiFetch(`/orthanc/servers/${serverId}/activate`, { method: 'POST' });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.detail || 'Activation failed');
+  }
+  return resp.json();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    AUTHENTICATED IMAGE / FILE HELPERS
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
  * Load an image via fetch with auth headers, then set the img src to a blob URL.
- * Call this after rendering to replace placeholder images.
  */
 async function loadAuthImage(imgElement, url) {
   try {
@@ -251,7 +309,6 @@ async function loadAuthImage(imgElement, url) {
     const blob = await resp.blob();
     imgElement.src = URL.createObjectURL(blob);
   } catch {
-    // Trigger the onerror handler on the img element
     imgElement.onerror?.();
   }
 }
@@ -276,5 +333,23 @@ async function downloadAuthFile(url, filename) {
     }, 100);
   } catch (err) {
     showToast(err.message || 'Download failed', 'error');
+  }
+}
+
+/**
+ * Open an authenticated PDF in a new browser tab.
+ */
+async function openAuthPdf(url, filename) {
+  try {
+    const resp = await apiFetch(url);
+    if (!resp.ok) throw new Error('Could not load PDF');
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
+    const newTab = window.open(blobUrl, '_blank');
+    if (!newTab) {
+      downloadAuthFile(url, filename || 'report.pdf');
+    }
+  } catch (err) {
+    showToast(err.message || 'Could not open PDF', 'error');
   }
 }

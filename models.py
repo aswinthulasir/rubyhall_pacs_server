@@ -2,16 +2,17 @@
 models.py — SQLAlchemy ORM table definitions for the Hospital PACS system.
 
 Tables:
-    roles           — User roles (admin, doctor, lab_assistant, etc.)
-    users           — System users with hashed passwords
-    dicom_studies   — Uploaded DICOM study records
-    pdf_reports     — PDF reports attached to studies (doctors only)
+    roles            — User roles (admin, doctor, lab_assistant, etc.)
+    users            — System users with hashed passwords
+    dicom_studies    — Uploaded DICOM study records
+    pdf_reports      — PDF reports attached to studies (doctors only)
+    orthanc_servers  — User-managed Orthanc server credentials
 """
 
 from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime,
-    ForeignKey, Boolean, Enum, Float,
+    ForeignKey, Boolean, Float,
 )
 from sqlalchemy.orm import relationship
 from database import Base
@@ -43,9 +44,14 @@ class User(Base):
     is_active       = Column(Boolean, default=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
 
-    role           = relationship("Role", back_populates="users")
-    dicom_studies  = relationship("DicomStudy", back_populates="uploader")
-    pdf_reports    = relationship("PdfReport", back_populates="uploader")
+    # Track which Orthanc the user last worked with
+    last_orthanc_id = Column(Integer, ForeignKey("orthanc_servers.id"), nullable=True)
+
+    role            = relationship("Role", back_populates="users")
+    dicom_studies   = relationship("DicomStudy", back_populates="uploader")
+    pdf_reports     = relationship("PdfReport", back_populates="uploader")
+    orthanc_servers = relationship("OrthancServer", back_populates="owner",
+                                   foreign_keys="OrthancServer.user_id")
 
     def __repr__(self):
         return f"<User id={self.id} username={self.username} role={self.role_id}>"
@@ -92,9 +98,9 @@ class DicomStudy(Base):
     uploader_id         = Column(Integer, ForeignKey("users.id"), nullable=False)
     upload_date         = Column(DateTime, default=datetime.utcnow)
 
-    # ── Lifecycle status ───────────────────────────────────────────────────────
+    # ── Lifecycle status (using String instead of Enum for SQLite compat) ─────
     status = Column(
-        Enum("PENDING", "CONFIRMED", "DELETED"),
+        String(20),
         default="PENDING",
         nullable=False,
     )
@@ -131,3 +137,24 @@ class PdfReport(Base):
 
     def __repr__(self):
         return f"<PdfReport id={self.id} study_id={self.study_id}>"
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+class OrthancServer(Base):
+    """User-managed Orthanc server credentials."""
+    __tablename__ = "orthanc_servers"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id"), nullable=False)
+    name        = Column(String(200), nullable=False)        # e.g. "CT Lab Orthanc"
+    url         = Column(String(500), nullable=False)        # e.g. "http://192.168.1.10:8042"
+    username    = Column(String(200), nullable=False, default="")
+    password    = Column(String(200), nullable=False, default="")
+    is_default  = Column(Boolean, default=False)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+    owner = relationship("User", back_populates="orthanc_servers",
+                          foreign_keys=[user_id])
+
+    def __repr__(self):
+        return f"<OrthancServer id={self.id} name={self.name} user_id={self.user_id}>"

@@ -64,8 +64,7 @@ function renderStudyDetail(container, study) {
             </div>
             <div>
               <table class="meta-table">
-                <tr><td>Patient Name</td><td>${escapeHtml(study.patient_name) || '—'}</td></tr>
-                <tr><td>MR Number</td><td><strong>${escapeHtml(study.mr_number)}</strong></td></tr>
+                <tr><td>Patient Name</td><td><strong style="font-size:1.1rem;">${escapeHtml(study.patient_name) || '—'}</strong></td></tr>
                 <tr><td>Age / DOB</td><td>${escapeHtml(study.patient_age) || '—'} / ${escapeHtml(study.patient_dob) || '—'}</td></tr>
                 <tr><td>Sex</td><td>${escapeHtml(study.patient_sex) || '—'}</td></tr>
                 <tr><td>Modality</td><td><span class="badge badge-blue">${escapeHtml(study.modality) || '—'}</span></td></tr>
@@ -103,6 +102,16 @@ function renderStudyDetail(container, study) {
                   <span class="pdf-name">📄 ${escapeHtml(r.file_name) || 'report.pdf'}
                     ${r.notes ? `<span class="text-muted text-sm">— ${escapeHtml(r.notes)}</span>` : ''}
                   </span>
+                  <span class="pdf-actions" style="display:flex; gap:0.5rem;">
+                    <button class="btn btn-blue btn-sm" title="View PDF"
+                            onclick="event.stopPropagation(); openAuthPdf('${r.file_url}', '${escapeHtml(r.file_name) || 'report.pdf'}')">
+                      👁️ View
+                    </button>
+                    <button class="btn btn-outline btn-sm" title="Download PDF"
+                            onclick="event.stopPropagation(); downloadAuthFile('${r.file_url}', '${escapeHtml(r.file_name) || 'report.pdf'}')">
+                      ⬇️ Download
+                    </button>
+                  </span>
                 </li>
               `).join('')}
             </ul>
@@ -111,7 +120,7 @@ function renderStudyDetail(container, study) {
 
         <!-- Doctor: Upload PDF -->
         ${isDoctor ? `
-          <div style="border-top:1px solid var(--border-color); padding: 1.25rem 1.5rem; background: #FEFCE8;">
+          <div style="border-top:1px solid var(--border-color); padding: 1.25rem 1.5rem; background: var(--brand-light);">
             <h4 style="font-size:0.95rem; font-weight:700; margin-bottom:0.75rem;">
               🩺 Attach PDF Report
             </h4>

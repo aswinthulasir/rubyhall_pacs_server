@@ -31,7 +31,7 @@ from database import get_db
 from models import DicomStudy, PdfReport, User
 from schemas import (
     DicomPreviewResponse, DicomStudyOut,
-    DicomConfirmRequest, PdfReportOut, MessageResponse,
+    PdfReportOut, MessageResponse,
 )
 from auth.security import get_current_user, require_doctor
 from services.dicom_service import (
@@ -59,7 +59,6 @@ MAX_PDF_BYTES   =  20 * 1024 * 1024   #  20 MB
 
 @router.post("/upload-multi", response_model=DicomPreviewResponse, status_code=201)
 async def upload_dicom_multi(
-    mr_number    : str              = Form(..., description="Hospital MR / Patient Registry Number"),
     dicom_files  : List[UploadFile] = File(..., description="One or more DICOM files (.dcm)"),
     current_user : User             = Depends(get_current_user),
     db           : Session          = Depends(get_db),
@@ -115,8 +114,11 @@ async def upload_dicom_multi(
     meta = first_meta or {}
 
     # Create a single study record for all the files
+    # Auto-generate mr_number from patient name for backward compat
+    auto_mr = (meta.get("patient_name") or "UNKNOWN").replace(" ", "_").upper()[:50]
+
     study = DicomStudy(
-        mr_number           = mr_number.strip(),
+        mr_number           = auto_mr,
         patient_name        = meta.get("patient_name"),
         patient_id_dicom    = meta.get("patient_id_dicom"),
         patient_age         = meta.get("patient_age"),
@@ -153,7 +155,6 @@ async def upload_dicom_multi(
 
     return DicomPreviewResponse(
         temp_study_id       = study.id,
-        mr_number           = study.mr_number,
         patient_name        = study.patient_name,
         patient_id_dicom    = study.patient_id_dicom,
         patient_age         = study.patient_age,
@@ -181,14 +182,10 @@ async def upload_dicom_multi(
 @router.post("/confirm/{study_id}", response_model=DicomStudyOut)
 def confirm_study(
     study_id     : int,
-    payload      : DicomConfirmRequest,
     current_user : User    = Depends(get_current_user),
     db           : Session = Depends(get_db),
 ):
-    """
-    Confirm and permanently save the study.
-    User may correct the MR Number at this step.
-    """
+    """Confirm and permanently save the study."""
     study = db.query(DicomStudy).filter(
         DicomStudy.id == study_id,
         DicomStudy.uploader_id == current_user.id,
@@ -201,7 +198,6 @@ def confirm_study(
     if study.status == "DELETED":
         raise HTTPException(400, "Study has been deleted")
 
-    study.mr_number  = payload.mr_number.strip()
     study.status     = "CONFIRMED"
     study.upload_date = datetime.utcnow()
 
@@ -213,13 +209,10 @@ def confirm_study(
 # ── Batch confirm ────────────────────────────────────────────────────────────
 @router.post("/confirm-batch", response_model=List[DicomStudyOut])
 def confirm_batch(
-    payload      : DicomConfirmRequest,
     current_user : User    = Depends(get_current_user),
     db           : Session = Depends(get_db),
 ):
-    """
-    Confirm ALL pending studies for the current user with the given MR number.
-    """
+    """Confirm ALL pending studies for the current user."""
     studies = (
         db.query(DicomStudy).filter(
             DicomStudy.uploader_id == current_user.id,
@@ -232,7 +225,6 @@ def confirm_batch(
 
     results = []
     for study in studies:
-        study.mr_number   = payload.mr_number.strip()
         study.status      = "CONFIRMED"
         study.upload_date = datetime.utcnow()
         results.append(study)
@@ -349,6 +341,30 @@ def download_dicom(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  Serve PDF Report
+# ══════════════════════════════════════════════════════════════════════════════
+
+@router.get("/pdf/{report_id}")
+def get_pdf_report(
+    report_id    : int,
+    current_user : User    = Depends(get_current_user),
+    db           : Session = Depends(get_db),
+):
+    """Serve a PDF report file for viewing in the browser."""
+    report = db.query(PdfReport).filter(PdfReport.id == report_id).first()
+    if not report:
+        raise HTTPException(404, "PDF report not found")
+    if not report.file_path or not os.path.isfile(report.file_path):
+        raise HTTPException(404, "PDF file not found on disk")
+
+    return FileResponse(
+        report.file_path,
+        media_type="application/pdf",
+        filename=report.file_name or f"report_{report_id}.pdf",
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  Delete
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -375,8 +391,12 @@ def delete_study(
 
     delete_file_if_exists(study.thumbnail_path)
 
+    # Clean up associated PDF files from disk
+    for pdf in study.pdf_reports:
+        delete_file_if_exists(pdf.file_path)
+
     study.status         = "DELETED"
-    study.file_path      = None
+    study.file_path      = ""     # Set to empty string instead of None to prevent DB IntegrityError
     study.thumbnail_path = None
     study.study_folder   = None
     db.commit()
@@ -460,4 +480,9 @@ def _enrich_study(study: DicomStudy, db: Session) -> DicomStudyOut:
     out = DicomStudyOut.model_validate(study)
     out.thumbnail_url = thumb_url
     out.uploader_name = uploader_name
+
+    # Populate file_url on each PDF report
+    for pdf_out in out.pdf_reports:
+        pdf_out.file_url = f"/dicom/pdf/{pdf_out.id}"
+
     return out

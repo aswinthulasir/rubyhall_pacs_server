@@ -56,14 +56,15 @@ class RoleOut(BaseModel):
 
 
 class UserOut(BaseModel):
-    id         : int
-    username   : str
-    email      : str
-    full_name  : str
-    role_id    : int
-    role       : Optional[RoleOut] = None
-    is_active  : bool
-    created_at : datetime
+    id              : int
+    username        : str
+    email           : str
+    full_name       : str
+    role_id         : int
+    role            : Optional[RoleOut] = None
+    is_active       : bool
+    created_at      : datetime
+    last_orthanc_id : Optional[int] = None
 
     model_config = {"from_attributes": True}
 
@@ -81,7 +82,6 @@ class UserUpdate(BaseModel):
 class DicomPreviewResponse(BaseModel):
     """Returned right after DICOM upload — before the user clicks Save."""
     temp_study_id       : int
-    mr_number           : str
     patient_name        : Optional[str]
     patient_id_dicom    : Optional[str]
     patient_age         : Optional[str]
@@ -101,14 +101,10 @@ class DicomPreviewResponse(BaseModel):
     thumbnail_url       : Optional[str]
 
 
-class DicomConfirmRequest(BaseModel):
-    """User may override/correct MR number at save time."""
-    mr_number : str
-
 
 class DicomStudyOut(BaseModel):
     id                  : int
-    mr_number           : str
+    mr_number           : Optional[str] = None
     patient_name        : Optional[str]
     patient_age         : Optional[str]
     patient_dob         : Optional[str]
@@ -142,6 +138,7 @@ class PdfReportOut(BaseModel):
     id          : int
     study_id    : int
     file_name   : Optional[str]
+    file_url    : Optional[str] = None
     notes       : Optional[str]
     upload_date : datetime
 
@@ -166,6 +163,45 @@ class SendOrthancResponse(BaseModel):
     message             : str
     orthanc_instance_id : Optional[str] = None
     orthanc_study_id    : Optional[str] = None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Orthanc Server Credentials
+# ══════════════════════════════════════════════════════════════════════════════
+
+class OrthancServerCreate(BaseModel):
+    name       : str
+    url        : str
+    username   : str = ""
+    password   : str = ""
+    is_default : bool = False
+
+
+class OrthancServerUpdate(BaseModel):
+    name       : Optional[str]  = None
+    url        : Optional[str]  = None
+    username   : Optional[str]  = None
+    password   : Optional[str]  = None
+    is_default : Optional[bool] = None
+
+
+class OrthancServerOut(BaseModel):
+    id         : int
+    user_id    : int
+    name       : str
+    url        : str
+    username   : str
+    password   : str
+    is_default : bool
+    created_at : datetime
+
+    model_config = {"from_attributes": True}
+
+
+class OrthancTestResult(BaseModel):
+    success : bool
+    message : str
+    version : Optional[str] = None
 
 
 # ══════════════════════════════════════════════════════════════════════════════

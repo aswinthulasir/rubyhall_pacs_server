@@ -18,21 +18,14 @@ async function renderDashboardPage(container) {
         </div>
         <div class="card-body">
           <form id="upload-form">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
-              <div class="form-group" style="margin-bottom:0;">
-                <label for="upload-mr">MR Number</label>
-                <input type="text" class="form-control" id="upload-mr"
-                       placeholder="e.g. A10023" required>
+            <div class="form-group" style="margin-bottom:0;">
+              <label>DICOM File(s) (.dcm)</label>
+              <div class="file-upload-area" id="dicom-drop-area" onclick="document.getElementById('upload-dicom').click()">
+                <div class="upload-icon">📁</div>
+                <div class="upload-text" id="dicom-file-label">Click to choose .dcm files</div>
               </div>
-              <div class="form-group" style="margin-bottom:0;">
-                <label>DICOM File(s) (.dcm)</label>
-                <div class="file-upload-area" id="dicom-drop-area" onclick="document.getElementById('upload-dicom').click()">
-                  <div class="upload-icon">📁</div>
-                  <div class="upload-text" id="dicom-file-label">Click to choose .dcm files</div>
-                </div>
-                <input type="file" id="upload-dicom" accept=".dcm,application/dicom,application/octet-stream"
-                       style="display:none" required multiple>
-              </div>
+              <input type="file" id="upload-dicom" accept=".dcm,application/dicom,application/octet-stream"
+                     style="display:none" required multiple>
             </div>
 
             ${isDoctor ? `
@@ -110,7 +103,6 @@ async function renderDashboardPage(container) {
   document.getElementById('upload-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('btn-upload');
-    const mr = document.getElementById('upload-mr').value.trim();
     const dicomFiles = document.getElementById('upload-dicom').files;
 
     if (dicomFiles.length === 0) {
@@ -122,8 +114,8 @@ async function renderDashboardPage(container) {
     btn.innerHTML = '<span class="spinner"></span> Uploading…';
 
     try {
-      const preview = await apiUploadDicomMulti(mr, dicomFiles);
-      showToast(`${dicomFiles.length} file(s) uploaded as one study! Review the preview below.`, 'success');
+      const preview = await apiUploadDicomMulti(dicomFiles);
+      showToast(`${dicomFiles.length} file(s) uploaded! Review the preview below.`, 'success');
       renderPreview(preview, isDoctor);
     } catch (err) {
       showToast(err.message, 'error');
@@ -159,13 +151,9 @@ function renderPreview(data, isDoctor) {
           </div>
           <div>
             <table class="meta-table">
-              <tr><td>File(s)</td><td><strong>${escapeHtml(data.file_name) || '1 file'}</strong></td></tr>
+              <tr><td>Patient Name</td><td><strong style="font-size:1.05rem;">${escapeHtml(data.patient_name) || '—'}</strong></td></tr>
+              <tr><td>File(s)</td><td>${escapeHtml(data.file_name) || '1 file'}</td></tr>
               <tr><td>Total Size</td><td>${formatFileSize(data.file_size_kb)}</td></tr>
-              <tr><td>Patient Name</td><td>${escapeHtml(data.patient_name) || '—'}</td></tr>
-              <tr><td>MR Number</td><td>
-                <input type="text" class="form-control" id="preview-mr"
-                       value="${escapeHtml(data.mr_number)}" style="max-width: 220px;">
-              </td></tr>
               <tr><td>Patient ID</td><td>${escapeHtml(data.patient_id_dicom) || '—'}</td></tr>
               <tr><td>Age / DOB</td><td>${escapeHtml(data.patient_age) || '—'} / ${escapeHtml(data.patient_dob) || '—'}</td></tr>
               <tr><td>Sex</td><td>${escapeHtml(data.patient_sex) || '—'}</td></tr>
@@ -198,18 +186,12 @@ function cancelPreview() {
 
 async function confirmBatch() {
   const btn = document.getElementById('btn-confirm');
-  const mr = document.getElementById('preview-mr').value.trim();
-
-  if (!mr) {
-    showToast('MR Number is required', 'warning');
-    return;
-  }
 
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span> Saving All…';
 
   try {
-    const studies = await apiConfirmBatch(mr);
+    const studies = await apiConfirmBatch();
     showToast(`${studies.length} studies saved to PACS! ✓`, 'success');
 
     // If doctor has a PDF attached, upload it to the FIRST study in the batch
@@ -292,12 +274,13 @@ function renderStudyCard(study) {
           : '<div class="thumb-placeholder">🩻</div>'}
       </div>
       <div class="study-info">
-        <div class="mr-number">MR: ${escapeHtml(study.mr_number)}</div>
-        <div class="patient-name">${escapeHtml(study.patient_name) || 'Unknown Patient'}</div>
+        <div class="patient-name" style="font-size:1.05rem; font-weight:700;">${escapeHtml(study.patient_name) || 'Unknown Patient'}</div>
         <div class="study-meta">
           <span>${escapeHtml(study.patient_age) || '—'}</span>
           <span>•</span>
-          <span>${escapeHtml(study.modality) || '—'}</span>
+          <span>${escapeHtml(study.patient_sex) || '—'}</span>
+          <span>•</span>
+          <span class="badge badge-blue" style="padding:0.15rem 0.5rem;">${escapeHtml(study.modality) || '—'}</span>
           <span>•</span>
           <span>📁 ${study.num_files || 1} file(s)</span>
         </div>

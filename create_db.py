@@ -5,35 +5,13 @@ Run this ONCE before starting the server:
     python create_db.py
 
 What it does:
-  1. Creates the MySQL database if it doesn't exist
+  1. Creates the SQLite database file if it doesn't exist
   2. Creates all tables defined in models.py
   3. Seeds the roles table with the five default roles
   4. Creates a default admin account (admin / Admin@123)
 """
 
 import sys
-import pymysql
-from sqlalchemy import text
-
-# ── Step 0: ensure the database itself exists ──────────────────────────────────
-def ensure_database_exists():
-    """Create the MySQL database if it doesn't already exist."""
-    conn = pymysql.connect(
-        host     = "localhost",
-        user     = "root",
-        password = "Aswin2000",
-        charset  = "utf8mb4",
-    )
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                f"CREATE DATABASE IF NOT EXISTS `hospital_pacs` "
-                f"CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-            )
-        conn.commit()
-        print("[OK] Database 'hospital_pacs' ready.")
-    finally:
-        conn.close()
 
 
 # ── Step 1: create tables ──────────────────────────────────────────────────────
@@ -42,7 +20,7 @@ def create_tables():
     import models   # noqa: F401 — registers all ORM models with Base
 
     Base.metadata.create_all(bind=engine)
-    print("[OK] All tables created.")
+    print("[OK] All tables created (SQLite).")
 
 
 # ── Step 2: seed roles ─────────────────────────────────────────────────────────
@@ -101,11 +79,10 @@ def seed_admin():
 # ══════════════════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     print("=" * 60)
-    print("  Hospital PACS — Database Setup")
+    print("  Hospital PACS — Database Setup (SQLite)")
     print("=" * 60)
 
     try:
-        ensure_database_exists()
         create_tables()
         seed_roles()
         seed_admin()
