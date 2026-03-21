@@ -93,8 +93,18 @@ def health_check():
 
 
 # ─── Startup event ─────────────────────────────────────────────────────────────
+from services.dicom_scp import start_scp, stop_scp
+
 @app.on_event("startup")
 async def on_startup():
     logger.info("Hospital PACS Server started.")
     logger.info("Orthanc target: %s", config.ORTHANC_URL)
     logger.info("Upload directory: %s", config.UPLOAD_ROOT_DIR)
+    # Start DICOM SCP receiver in background
+    start_scp()
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    logger.info("Hospital PACS Server shutting down.")
+    stop_scp()

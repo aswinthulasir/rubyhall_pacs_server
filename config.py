@@ -36,8 +36,12 @@ ROLES = {
     5: "radiologist",
 }
 
-# ─── RadiAnt DICOM Viewer (C-STORE SCP) ───────────────────────────────────────
+# ─── RadiAnt DICOM Viewer (C-STORE SCU → RadiAnt SCP) ─────────────────────────
 RADIANT_AE_TITLE = os.getenv("RADIANT_AE_TITLE", "RADIANT")
 RADIANT_HOST     = os.getenv("RADIANT_HOST", "127.0.0.1")
 RADIANT_PORT     = int(os.getenv("RADIANT_PORT", "11113"))
+
+# ─── Our DICOM SCP Server (receives studies FROM RadiAnt / other DICOM clients)─
 SCU_AE_TITLE     = os.getenv("SCU_AE_TITLE", "HOSPITAL_PACS")
+SCP_AE_TITLE     = os.getenv("SCP_AE_TITLE", "HOSPITAL_PACS")
+SCP_PORT         = int(os.getenv("SCP_PORT", "10402"))
