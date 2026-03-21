@@ -1,5 +1,5 @@
 uploads/
-venv/
 hospital_pacs.db
-.env
+hospital_pacs.db-shm
+hospital_pacs.db-wal
 __pycache__/
